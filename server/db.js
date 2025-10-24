@@ -32,7 +32,8 @@ CREATE TABLE IF NOT EXISTS users (
   role_id INTEGER NOT NULL REFERENCES roles(id),
   full_name TEXT,
   is_owner INTEGER DEFAULT 0,
-  last_login TEXT
+  last_login TEXT,
+  deleted_at TEXT DEFAULT NULL
 );
 
 CREATE TABLE IF NOT EXISTS products (
@@ -89,6 +90,29 @@ CREATE TABLE IF NOT EXISTS notes (
   created_by INTEGER,
   created_at TEXT DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS sales (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  product_id INTEGER NOT NULL REFERENCES products(id),
+  quantity INTEGER NOT NULL,
+  unit_price_cents INTEGER NOT NULL,
+  total_cents INTEGER NOT NULL,
+  buyer_name TEXT NOT NULL,
+  buyer_phone TEXT,
+  buyer_email TEXT,
+  buyer_address TEXT,
+  created_by INTEGER,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS stock_refills (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  product_id INTEGER NOT NULL REFERENCES products(id),
+  quantity INTEGER NOT NULL,
+  notes TEXT,
+  created_by INTEGER,
+  created_at TEXT DEFAULT (datetime('now'))
+);
 `);
 
 // ---------- seed ----------
@@ -117,6 +141,19 @@ if (!haveOwner) {
 
   console.log("Seeded owner → username: owner / password: owner123");
   console.log("Seeded admin  → username: admin / password: demo");
+}
+
+// ---------- migrations ----------
+// Add deleted_at column to existing users table if it doesn't exist
+try {
+  const columns = db.pragma("table_info(users)");
+  const hasDeletedAt = columns.some(col => col.name === "deleted_at");
+  if (!hasDeletedAt) {
+    db.exec("ALTER TABLE users ADD COLUMN deleted_at TEXT DEFAULT NULL");
+    console.log("✅ Migration: Added deleted_at column to users table");
+  }
+} catch (e) {
+  console.error("Migration error:", e);
 }
 
 export default db;

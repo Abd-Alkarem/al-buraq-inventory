@@ -1,4 +1,4 @@
-﻿// client/src/state/auth.jsx
+// client/src/state/auth.jsx
 import React, { createContext, useContext, useEffect, useState } from "react";
 
 export const API = {
@@ -60,6 +60,89 @@ export const API = {
       method: "PUT",
       headers: { "Content-Type":"application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify(p)
+    });
+    return this._json(r);
+  },
+
+  async deleteProduct(token, id) {
+    const r = await fetch(`${this.base}/api/products/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return this._json(r);
+  },
+
+  async getDashboardAnalytics(token, params = {}) {
+    const query = new URLSearchParams(params).toString();
+    const r = await fetch(`${this.base}/api/products/analytics/dashboard?${query}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return this._json(r);
+  },
+
+  /* -------- Sales endpoints -------- */
+  async listSales(token) {
+    const r = await fetch(`${this.base}/api/sales`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return this._json(r);
+  },
+
+  async getSale(token, id) {
+    const r = await fetch(`${this.base}/api/sales/${id}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return this._json(r);
+  },
+
+  async createSale(token, saleData) {
+    const r = await fetch(`${this.base}/api/sales`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(saleData)
+    });
+    return this._json(r);
+  },
+
+  async deleteSale(token, id) {
+    const r = await fetch(`${this.base}/api/sales/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return this._json(r);
+  },
+
+  getExportReceiptUrl(token, id) {
+    return `${this.base}/api/sales/${id}/export?token=${encodeURIComponent(token)}`;
+  },
+
+  /* -------- Stock endpoints -------- */
+  async listStock(token) {
+    const r = await fetch(`${this.base}/api/stock`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return this._json(r);
+  },
+
+  async getStockStats(token) {
+    const r = await fetch(`${this.base}/api/stock/stats`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return this._json(r);
+  },
+
+  async getProductRefills(token, productId) {
+    const r = await fetch(`${this.base}/api/stock/refills/${productId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return this._json(r);
+  },
+
+  async createRefill(token, refillData) {
+    const r = await fetch(`${this.base}/api/stock/refills`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(refillData)
     });
     return this._json(r);
   },

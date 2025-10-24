@@ -11,6 +11,8 @@ import { authRouter } from "./auth.js";
 import { productsRouter } from "./products.js";
 import { adminRouter } from "./owner_admin.js";
 import { fxRouter } from "./fx.js";   // live currency rates
+import { salesRouter } from "./sales.js";
+import { stockRouter } from "./stock.js";
 
 const app = express();
 app.use(express.json({ limit: "10mb" }));
@@ -52,6 +54,8 @@ app.use("/api/auth", authRouter);
 app.use("/api/products", productsRouter);   // admin + public endpoints live here
 app.use("/api/owner", adminRouter);         // owner-only tools
 app.use("/api/fx", fxRouter);               // live currency rates
+app.use("/api/sales", salesRouter);         // sales management
+app.use("/api/stock", stockRouter);         // stock management & refills
 
 /* ------------ Start ------------ */
 const PORT = Number(process.env.PORT || 4000);
