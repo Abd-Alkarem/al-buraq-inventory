@@ -94,6 +94,126 @@ productsRouter.get("/public/products", (req, res) => {
 /* ---------- AUTH required below ---------- */
 productsRouter.use(requireAuth);
 
+/* DASHBOARD ANALYTICS */
+productsRouter.get("/analytics/dashboard", (req, res) => {
+  try {
+    const { period = "month", year, month, day } = req.query;
+    
+    // Build date filter based on period
+    let dateFilter = "";
+    const now = new Date();
+    
+    if (period === "day" && year && month && day) {
+      dateFilter = `AND DATE(created_at) = '${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}'`;
+    } else if (period === "month" && year && month) {
+      dateFilter = `AND strftime('%Y-%m', created_at) = '${year}-${String(month).padStart(2, '0')}'`;
+    } else if (period === "year" && year) {
+      dateFilter = `AND strftime('%Y', created_at) = '${year}'`;
+    } else {
+      // Default: current month
+      const currentYear = now.getFullYear();
+      const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
+      dateFilter = `AND strftime('%Y-%m', created_at) = '${currentYear}-${currentMonth}'`;
+    }
+
+    // Get all products for current stock
+    const products = db.prepare(`SELECT * FROM products`).all();
+    const totalProducts = products.length;
+    const totalStock = products.reduce((sum, p) => sum + (p.on_hand || 0), 0);
+    const lowStockCount = products.filter(p => (p.on_hand || 0) < 10).length;
+
+    // Sales data (from stock_movements with reason='sale')
+    const salesData = db.prepare(`
+      SELECT 
+        SUM(ABS(change)) as units_sold,
+        COUNT(DISTINCT product_id) as products_sold
+      FROM stock_movements 
+      WHERE reason = 'sale' ${dateFilter}
+    `).get();
+
+    // Revenue calculation (price_cents * units sold per product)
+    const revenueData = db.prepare(`
+      SELECT 
+        sm.product_id,
+        p.price_cents,
+        p.cost_cents,
+        SUM(ABS(sm.change)) as units
+      FROM stock_movements sm
+      JOIN products p ON p.id = sm.product_id
+      WHERE sm.reason = 'sale' ${dateFilter}
+      GROUP BY sm.product_id
+    `).all();
+
+    let totalRevenue = 0;
+    let totalCost = 0;
+    revenueData.forEach(r => {
+      totalRevenue += (r.price_cents || 0) * (r.units || 0);
+      totalCost += (r.cost_cents || 0) * (r.units || 0);
+    });
+    const totalProfit = totalRevenue - totalCost;
+
+    // Sales trend (daily breakdown for charts)
+    const trendQuery = period === "year" 
+      ? `SELECT strftime('%Y-%m', created_at) as date, SUM(ABS(change)) as units
+         FROM stock_movements 
+         WHERE reason = 'sale' ${dateFilter}
+         GROUP BY strftime('%Y-%m', created_at)
+         ORDER BY date`
+      : `SELECT DATE(created_at) as date, SUM(ABS(change)) as units
+         FROM stock_movements 
+         WHERE reason = 'sale' ${dateFilter}
+         GROUP BY DATE(created_at)
+         ORDER BY date`;
+    
+    const salesTrend = db.prepare(trendQuery).all();
+
+    // Top selling products
+    const topProducts = db.prepare(`
+      SELECT 
+        p.id, p.name, p.sku, p.brand,
+        SUM(ABS(sm.change)) as units_sold,
+        SUM(ABS(sm.change) * p.price_cents) as revenue
+      FROM stock_movements sm
+      JOIN products p ON p.id = sm.product_id
+      WHERE sm.reason = 'sale' ${dateFilter}
+      GROUP BY p.id
+      ORDER BY units_sold DESC
+      LIMIT 5
+    `).all();
+
+    // Stock movements by reason
+    const movementsByReason = db.prepare(`
+      SELECT reason, COUNT(*) as count, SUM(ABS(change)) as total_units
+      FROM stock_movements
+      WHERE 1=1 ${dateFilter}
+      GROUP BY reason
+    `).all();
+
+    res.json({
+      summary: {
+        totalProducts,
+        totalStock,
+        lowStockCount,
+        unitsSold: salesData.units_sold || 0,
+        productsSold: salesData.products_sold || 0,
+        revenue: totalRevenue,
+        cost: totalCost,
+        profit: totalProfit,
+        profitMargin: totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100).toFixed(2) : 0
+      },
+      salesTrend,
+      topProducts: topProducts.map(p => ({
+        ...p,
+        revenue: p.revenue || 0
+      })),
+      movementsByReason
+    });
+  } catch (e) {
+    console.error("dashboard analytics failed:", e);
+    res.status(500).json({ error: "analytics failed" });
+  }
+});
+
 /* LIST (admin) */
 productsRouter.get("/", (req, res) => {
   try {
@@ -319,5 +439,28 @@ productsRouter.post("/:id/images", upload.single("file"), (req, res) => {
   } catch (e) {
     console.error("upload failed:", e);
     res.status(500).json({ error: "upload failed" });
+  }
+});
+
+/* DELETE product */
+productsRouter.delete("/:id", (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const p = db.prepare(`SELECT * FROM products WHERE id=?`).get(id);
+    if (!p) return res.status(404).json({ error: "not found" });
+
+    // Delete in transaction: images, movements, edits, then product
+    const tx = db.transaction(() => {
+      db.prepare(`DELETE FROM product_images WHERE product_id=?`).run(id);
+      db.prepare(`DELETE FROM stock_movements WHERE product_id=?`).run(id);
+      db.prepare(`DELETE FROM product_edits WHERE product_id=?`).run(id);
+      db.prepare(`DELETE FROM products WHERE id=?`).run(id);
+    });
+    tx();
+
+    res.json({ success: true, message: "Product deleted" });
+  } catch (e) {
+    console.error("delete failed:", e);
+    res.status(500).json({ error: "delete failed" });
   }
 });

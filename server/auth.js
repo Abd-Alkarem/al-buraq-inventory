@@ -12,7 +12,7 @@ function getUserByUsername(username) {
     SELECT u.*, r.name AS role
     FROM users u
     JOIN roles r ON r.id = u.role_id
-    WHERE u.username = ?
+    WHERE u.username = ? AND u.deleted_at IS NULL
   `).get(username);
 }
 

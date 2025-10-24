@@ -57,6 +57,7 @@ adminRouter.get("/users", (_req, res) => {
     FROM users u
     JOIN roles r ON r.id = u.role_id
     LEFT JOIN admin_permissions ap ON ap.user_id = u.id
+    WHERE u.deleted_at IS NULL
     ORDER BY u.is_owner DESC, u.username ASC
   `).all();
   res.json(users);
@@ -113,7 +114,7 @@ adminRouter.put("/users/:id", (req, res) => {
   res.json({ ok: true });
 });
 
-/* ---------- DELETE USER (detach FKs first) ---------- */
+/* ---------- SOFT DELETE USER ---------- */
 adminRouter.delete("/users/:id", (req, res) => {
   const id = Number(req.params.id);
   const me = req.user?.uid;
@@ -121,20 +122,14 @@ adminRouter.delete("/users/:id", (req, res) => {
   if (!target) return res.status(404).json({ error: "not found" });
   if (target.is_owner) return res.status(400).json({ error: "cannot delete owner" });
   if (target.id === me) return res.status(400).json({ error: "cannot delete yourself" });
+  if (target.deleted_at) return res.status(400).json({ error: "user already deleted" });
 
   try {
-    const tx = db.transaction(() => {
-      // Detach dependent rows so FK constraints don't block deletion
-      db.prepare("UPDATE login_history   SET user_id=NULL WHERE user_id=?").run(id);
-      db.prepare("UPDATE stock_movements SET user_id=NULL WHERE user_id=?").run(id);
-      db.prepare("UPDATE product_images  SET uploaded_by=NULL WHERE uploaded_by=?").run(id);
-      // Finally delete the user
-      db.prepare("DELETE FROM users WHERE id=?").run(id);
-    });
-    tx();
-    res.json({ ok: true });
+    // Soft delete: just set deleted_at timestamp
+    db.prepare("UPDATE users SET deleted_at = CURRENT_TIMESTAMP WHERE id=?").run(id);
+    res.json({ ok: true, message: "User soft deleted successfully" });
   } catch (e) {
-    console.error("delete user failed:", e);
+    console.error("soft delete user failed:", e);
     res.status(500).json({ error: "delete failed" });
   }
 });

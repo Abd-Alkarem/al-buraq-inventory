@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth, API } from "../state/auth.jsx";
+import { useCurrency } from "../hooks/useCurrency.jsx";
 
 const TIMEZONES = [
   Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
@@ -13,6 +14,7 @@ export default function ProductForm({ mode }) {
   const { id } = useParams();
   const nav = useNavigate();
   const { token, user } = useAuth();
+  const { currency, formatWithSymbol } = useCurrency();
 
   // banner error
   const [err, setErr] = useState("");
@@ -171,10 +173,16 @@ export default function ProductForm({ mode }) {
           <L label="Price (USD)">
             <input className="w-full border rounded-xl p-2.5" inputMode="decimal"
                    value={price} onChange={e => setPrice(e.target.value.replace(/[^0-9.]/g, ""))} />
+            {currency !== "USD" && price && (
+              <p className="text-xs text-gray-500 mt-1">≈ {formatWithSymbol(parseFloat(price))}</p>
+            )}
           </L>
           <L label="Cost (USD)">
             <input className="w-full border rounded-xl p-2.5" inputMode="decimal"
                    value={cost} onChange={e => setCost(e.target.value.replace(/[^0-9.]/g, ""))} />
+            {currency !== "USD" && cost && (
+              <p className="text-xs text-gray-500 mt-1">≈ {formatWithSymbol(parseFloat(cost))}</p>
+            )}
           </L>
           <div />
           <L label="On Hand">

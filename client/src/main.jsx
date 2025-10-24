@@ -8,7 +8,8 @@ import Login from "./routes/Login.jsx";
 import Dashboard from "./routes/Dashboard.jsx";
 import Products from "./routes/Products.jsx";
 import ProductForm from "./routes/ProductForm.jsx";
-import Scan from "./routes/Scan.jsx";
+import Sales from "./routes/Sales.jsx";
+import Stock from "./routes/Stock.jsx";
 import OwnerAdmins from "./routes/OwnerAdmins.jsx";
 import { AuthProvider, useAuth } from "./state/auth.jsx";
 
@@ -48,8 +49,12 @@ createRoot(document.getElementById("root")).render(
               element={<PrivateRoute><ProductForm mode="edit" /></PrivateRoute>}
             />
             <Route
-              path="/scan"
-              element={<PrivateRoute><Scan /></PrivateRoute>}
+              path="/sales"
+              element={<PrivateRoute><Sales /></PrivateRoute>}
+            />
+            <Route
+              path="/stock"
+              element={<PrivateRoute><Stock /></PrivateRoute>}
             />
             <Route
               path="/owner/admins"
